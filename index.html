@@ -663,8 +663,53 @@ function sfxTick(left){
     if (left <= 5) tone({ f:880 + (5 - left) * 90, t:0.09, type:'square', vol:0.06, at:0.5 });
   }
 }
+// tepuk tangan ramai: ratusan "plok" acak yang disaring
+function applause(o){
+  const a = ac(); if (!a || muted) return;
+  const dur = o.t || 1.6, vol = o.vol || 0.3, at = o.at || 0;
+  const sr = a.sampleRate, len = Math.floor(sr * dur);
+  const buf = a.createBuffer(1, len, sr), d = buf.getChannelData(0);
+  for (let k = 0; k < dur * 55; k++){
+    const start = Math.floor(Math.random() * (len - 1));
+    const clapLen = Math.floor(sr * (0.015 + Math.random() * 0.03));
+    const amp = 0.4 + Math.random() * 0.6;
+    for (let i = 0; i < clapLen && start + i < len; i++){
+      d[start + i] += (Math.random() * 2 - 1) * amp * Math.pow(1 - i / clapLen, 2);
+    }
+  }
+  const src = a.createBufferSource(); src.buffer = buf;
+  const bp = a.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 2200; bp.Q.value = 0.5;
+  const g = a.createGain();
+  const t0 = a.currentTime + at;
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(vol, t0 + 0.15);
+  g.gain.setValueAtTime(vol, t0 + dur * 0.6);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  src.connect(bp); bp.connect(g); g.connect(a.destination);
+  src.start(t0);
+}
+// jawaban benar: meriah (letusan konfeti + terompet + tepuk tangan + kilauan)
 function sfxCorrect(){
-  [659, 880, 1175].forEach((f, i) => tone({ f, t:0.28, type:'triangle', vol:0.16, at:i*0.09 }));
+  // letusan konfeti
+  noise({ t:0.12, vol:0.28, from:4000, to:900 });
+  tone({ f:220, slide:60, t:0.12, vol:0.2 });
+  noise({ t:0.12, vol:0.2, from:4000, to:900, at:0.14 });
+  // terompet pesta naik
+  [523, 659, 784, 1047, 1319].forEach((f, i) => {
+    tone({ f, t:0.22, type:'sawtooth', vol:0.07, at:0.05 + i*0.08 });
+    tone({ f, t:0.22, type:'triangle', vol:0.12, at:0.05 + i*0.08 });
+  });
+  // akord penutup yang panjang
+  [523, 659, 784, 1047].forEach(f => {
+    tone({ f, t:1.1, type:'triangle', vol:0.1, at:0.5 });
+    tone({ f:f*2, t:0.9, type:'sine', vol:0.04, at:0.5 });
+  });
+  // tepuk tangan penonton
+  applause({ t:1.7, vol:0.32, at:0.35 });
+  // kilauan
+  for (let i = 0; i < 10; i++){
+    tone({ f:1800 + Math.random()*2600, t:0.18, type:'sine', vol:0.05, at:0.4 + i*0.1 });
+  }
 }
 function sfxWrong(){
   tone({ f:180, slide:90, t:0.45, type:'sawtooth', vol:0.14 });
