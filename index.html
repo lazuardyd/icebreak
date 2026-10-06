@@ -280,7 +280,7 @@
   .face.back.easy .prize-pts{ color:var(--cyan); }
   .face.back.med .prize-pts{ color:var(--amber); }
   .face.back.hard .prize-pts{ color:var(--magenta); }
-  .face.back .prize-unit{ font-size:22px; font-weight:700; letter-spacing:.2em; }
+  .face.back .prize-unit{ font-size:16px; font-weight:700; letter-spacing:.16em; color:var(--ink); padding:0 10px; }
   .face.back .prize-diff{ font-family:var(--font-mono); font-size:13px; letter-spacing:.18em; color:var(--ink); background:var(--bg-0); border:1px solid var(--line); padding:5px 12px; border-radius:99px; margin-top:6px; }
   .face.back .prize-time{ font-family:var(--font-mono); font-size:12px; color:var(--ink-dim); margin-top:2px; }
   .reveal-btn{
@@ -297,6 +297,14 @@
   .start-btn:disabled{ opacity:.45; cursor:default; filter:none; }
   .face.back .prize-pts.txt{ font-size:44px; line-height:1.15; padding:0 14px; word-break:break-word; }
 
+  .sound-btn{
+    position:fixed; top:14px; right:14px; z-index:60;
+    width:42px; height:42px; border-radius:50%;
+    background:var(--panel); border:1px solid var(--line);
+    font-size:18px; cursor:pointer; color:var(--ink);
+  }
+  .sound-btn:hover{ border-color:var(--amber); }
+
   @media (max-width:640px){
     .board{ grid-template-columns:repeat(4, 1fr); }
     .qcard .pts{ font-size:20px; }
@@ -311,6 +319,7 @@
 </style>
 </head>
 <body>
+<button class="sound-btn" id="sound-btn" onclick="toggleSound()" title="Suara">🔊</button>
 <div class="wrap">
 
   <!-- ============ START SCREEN ============ -->
@@ -333,11 +342,11 @@
         <h1>Prop<span>Logic</span></h1>
       </div>
       <div class="hud-stats">
-        <div class="stat"><div class="num" id="stat-score">0</div><div class="lbl">POIN</div></div>
+        <div class="stat"><div class="num" id="stat-score">0</div><div class="lbl">BENAR</div></div>
         <div class="stat"><div class="num" id="stat-done">0/20</div><div class="lbl">TERJAWAB</div></div>
       </div>
     </div>
-    <div class="board-hint">Pilih satu kartu. <b>Hadiahnya misteri</b> — baru ketahuan setelah kartu dibuka!</div>
+    <div class="board-hint">Pilih satu kartu. <b>Isinya misteri</b> — baru ketahuan setelah kartu dibuka!</div>
 
     <div class="board" id="board"></div>
 
@@ -350,7 +359,7 @@
   <div class="screen" id="screen-question">
     <div class="card">
       <div class="qmeta">
-        <div class="qtag" id="qtag">KARTU 01 · <b>DASAR · 10 PT</b></div>
+        <div class="qtag" id="qtag">KARTU <b>01</b></div>
         <div class="timer-ring">
           <svg width="46" height="46">
             <circle class="bg" cx="23" cy="23" r="19"></circle>
@@ -388,7 +397,7 @@
   <div class="screen" id="screen-end">
     <div class="card center-txt">
       <span class="rank-badge" id="end-rank">◆ HASIL ◆</span>
-      <div class="score-big"><span id="end-score">0</span><span id="end-max">/400</span></div>
+      <div class="score-big"><span id="end-score">0</span><span id="end-max">/20 benar</span></div>
       <p class="lead" id="end-msg">Memuat hasil...</p>
       <button class="retry-btn" id="btn-retry" onclick="restart()">MAIN LAGI ↻</button>
     </div>
@@ -405,11 +414,9 @@
         <div class="card-no" id="reveal-no">KARTU 01</div>
       </div>
       <div class="face back" id="reveal-back">
-        <div class="prize-lbl">HADIAHMU</div>
-        <div class="prize-pts" id="reveal-pts">30</div>
-        <div class="prize-unit" id="reveal-unit">POIN</div>
-        <div class="prize-diff" id="reveal-diff">SULIT</div>
-        <div class="prize-time" id="reveal-time">Waktu: 50 detik</div>
+        <div class="prize-lbl" id="reveal-lbl">KARTU TERBUKA</div>
+        <div class="prize-pts" id="reveal-pts">⚡</div>
+        <div class="prize-unit" id="reveal-unit">SIAP MENJAWAB?</div>
       </div>
     </div>
   </div>
@@ -549,10 +556,140 @@ function renderIntro(){
   const lolos = Math.ceil(MAX_SCORE * CONFIG.LOLOS_PERSEN / 100);
   let html = '';
   if (infos.length === 1) html += `<li>Ketentuan soal: <span style="font-family:var(--font-mono);color:var(--cyan)">${esc(infos[0])}</span></li>`;
-  html += `<li>Hadiah di balik kartu berbeda-beda dan posisinya diacak tiap permainan — makin besar hadiahnya, biasanya makin sulit soalnya.</li>`;
-  html += `<li>Waktu menjawab: <b>${esc(tText)}</b>. Habis waktu = otomatis salah, poin hangus.</li>`;
-  html += `<li>Total maksimal papan ini: <b>${MAX_SCORE} poin</b>. ≥ ${champ} = <b>GRAND CHAMPION</b>, ${lolos}–${champ - 1} = <b>LOLOS BABAK</b>, &lt; ${lolos} = <b>TERELIMINASI</b>.</li>`;
+  html += `<li>Pilih satu kartu, buka, lalu jawab <b>BENAR</b> atau <b>SALAH</b>. Posisi soal diacak tiap permainan.</li>`;
+  html += `<li>Waktu menjawab: <b>${esc(tText)}</b>. Habis waktu = otomatis salah.</li>`;
   el('rules-list').innerHTML = html;
+}
+
+// =====================================================
+//  EFEK SUARA (dibuat langsung di browser, tanpa file audio)
+// =====================================================
+let AC = null, muted = false, drone = null;
+try { muted = localStorage.getItem('lc_muted') === '1'; } catch(e){}
+
+function ac(){
+  if (!AC){
+    const C = window.AudioContext || window.webkitAudioContext;
+    if (C) AC = new C();
+  }
+  if (AC && AC.state === 'suspended') AC.resume();
+  return AC;
+}
+function tone(o){
+  const a = ac(); if (!a || muted) return;
+  const f = o.f || 440, t = o.t || 0.15, vol = o.vol || 0.15, at = o.at || 0;
+  const osc = a.createOscillator(), g = a.createGain();
+  const t0 = a.currentTime + at;
+  osc.type = o.type || 'sine';
+  osc.frequency.setValueAtTime(f, t0);
+  if (o.slide) osc.frequency.exponentialRampToValueAtTime(o.slide, t0 + t);
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(vol, t0 + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + t);
+  osc.connect(g); g.connect(a.destination);
+  osc.start(t0); osc.stop(t0 + t + 0.03);
+}
+function noise(o){
+  const a = ac(); if (!a || muted) return;
+  const t = o.t || 0.6, vol = o.vol || 0.12, at = o.at || 0;
+  const len = Math.floor(a.sampleRate * t);
+  const buf = a.createBuffer(1, len, a.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  const src = a.createBufferSource(); src.buffer = buf;
+  const bp = a.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 1.2;
+  const g = a.createGain();
+  const t0 = a.currentTime + at;
+  bp.frequency.setValueAtTime(o.from || 300, t0);
+  bp.frequency.exponentialRampToValueAtTime(o.to || 3000, t0 + t);
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(vol, t0 + t * 0.85);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + t);
+  src.connect(bp); bp.connect(g); g.connect(a.destination);
+  src.start(t0);
+}
+
+// kartu diklik: gemuruh naik selama kartu bergoyang
+function sfxPick(){
+  noise({ t:0.7, vol:0.22, from:200, to:2600 });
+  tone({ f:70, slide:140, t:0.7, type:'sawtooth', vol:0.07 });
+}
+// kartu terbuka: "ta-da" berkilau
+function sfxReveal(){
+  noise({ t:0.25, vol:0.12, from:3000, to:9000 });
+  [523, 659, 784, 1047].forEach((f, i) => tone({ f, t:0.5, type:'triangle', vol:0.13, at:i*0.08 }));
+  tone({ f:1568, t:0.9, type:'sine', vol:0.08, at:0.32 });
+}
+// latar menegangkan selama soal dikerjakan
+function startDrone(){
+  stopDrone();
+  const a = ac(); if (!a || muted) return;
+  const g = a.createGain();
+  g.gain.setValueAtTime(0.0001, a.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.05, a.currentTime + 1.5);
+  const o1 = a.createOscillator(), o2 = a.createOscillator();
+  o1.type = 'sawtooth'; o2.type = 'sawtooth';
+  o1.frequency.value = 55; o2.frequency.value = 58.3;
+  const lp = a.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 220;
+  const lfo = a.createOscillator(), lg = a.createGain();
+  lfo.frequency.value = 0.8; lg.gain.value = 0.02;
+  lfo.connect(lg); lg.connect(g.gain);
+  o1.connect(lp); o2.connect(lp); lp.connect(g); g.connect(a.destination);
+  o1.start(); o2.start(); lfo.start();
+  drone = { g, o1, o2, lfo, lp };
+}
+function stopDrone(){
+  if (!drone || !AC) { drone = null; return; }
+  const { g, o1, o2, lfo } = drone;
+  try {
+    g.gain.cancelScheduledValues(AC.currentTime);
+    g.gain.setValueAtTime(Math.max(g.gain.value, 0.0001), AC.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001, AC.currentTime + 0.25);
+    [o1, o2, lfo].forEach(o => o.stop(AC.currentTime + 0.3));
+  } catch(e){}
+  drone = null;
+}
+// detik berjalan: tik biasa, lalu detak jantung & bip makin cepat saat waktu menipis
+function sfxTick(left){
+  if (drone && AC){
+    const up = left <= 10 ? 1 + (10 - left) * 0.05 : 1;
+    drone.o1.frequency.setTargetAtTime(55 * up, AC.currentTime, 0.3);
+    drone.o2.frequency.setTargetAtTime(58.3 * up, AC.currentTime, 0.3);
+  }
+  if (left > 10){
+    tone({ f:1200, t:0.04, type:'square', vol:0.035 });
+  } else {
+    tone({ f:130, slide:48, t:0.14, vol:0.22 });
+    tone({ f:130, slide:48, t:0.14, vol:0.16, at:0.2 });
+    if (left <= 5) tone({ f:880 + (5 - left) * 90, t:0.09, type:'square', vol:0.06, at:0.5 });
+  }
+}
+function sfxCorrect(){
+  [659, 880, 1175].forEach((f, i) => tone({ f, t:0.28, type:'triangle', vol:0.16, at:i*0.09 }));
+}
+function sfxWrong(){
+  tone({ f:180, slide:90, t:0.45, type:'sawtooth', vol:0.14 });
+  tone({ f:170, slide:80, t:0.45, type:'square', vol:0.07, at:0.02 });
+}
+function sfxTimeout(){
+  tone({ f:300, slide:60, t:0.8, type:'sawtooth', vol:0.14 });
+}
+function sfxFanfare(){
+  [523, 523, 523, 659, 784, 1047].forEach((f, i) => tone({ f, t:i === 5 ? 0.9 : 0.16, type:'triangle', vol:0.14, at:i*0.13 }));
+}
+
+function toggleSound(){
+  muted = !muted;
+  try { localStorage.setItem('lc_muted', muted ? '1' : '0'); } catch(e){}
+  updateSoundBtn();
+  if (muted) stopDrone();
+  else {
+    ac();
+    if (el('screen-question').classList.contains('show') && !answered) startDrone();
+  }
+}
+function updateSoundBtn(){
+  const b = document.getElementById('sound-btn');
+  if (b) b.textContent = muted ? '🔇' : '🔊';
 }
 
 let score = 0;
@@ -578,6 +715,7 @@ function shuffleDeck(){
 }
 
 el('btn-start').addEventListener('click', () => {
+  ac();
   shuffleDeck();
   showScreen('board');
   renderBoard();
@@ -601,7 +739,7 @@ function renderBoard(){
     board.appendChild(c);
   });
   const doneCount = states.filter(s => s !== null).length;
-  el('stat-score').textContent = score;
+  el('stat-score').textContent = states.filter(s => s === true).length;
   el('stat-done').textContent = `${doneCount}/${QUESTIONS.length}`;
 }
 
@@ -617,18 +755,20 @@ function revealCard(i){
   el('reveal-no').textContent = `KARTU ${String(i+1).padStart(2,'0')}`;
   const ptsEl = el('reveal-pts');
   if (q.prize){
+    el('reveal-lbl').textContent = 'HADIAHMU';
     ptsEl.textContent = q.prize;
     ptsEl.classList.add('txt');
-    el('reveal-unit').textContent = q.pts ? `+${q.pts} POIN` : 'HADIAH';
+    el('reveal-unit').textContent = 'JIKA JAWABANMU BENAR!';
   } else {
-    ptsEl.textContent = q.pts;
+    el('reveal-lbl').textContent = 'KARTU TERBUKA';
+    ptsEl.textContent = '⚡';
     ptsEl.classList.remove('txt');
-    el('reveal-unit').textContent = 'POIN';
+    el('reveal-unit').textContent = 'SIAP MENJAWAB?';
   }
-  el('reveal-diff').textContent = DIFF_LABEL[q.diff];
-  el('reveal-time').textContent = `Waktu: ${q.time} detik`;
-  el('reveal-back').className = 'face back ' + q.diff;
+  el('reveal-back').className = 'face back';
 
+  ac();
+  sfxPick();
   flip.className = 'flip-card';
   btn.classList.remove('show');
   el('reveal').classList.add('show');
@@ -639,6 +779,7 @@ function revealCard(i){
   revealTimers.push(setTimeout(() => {
     flip.classList.remove('shake');
     flip.classList.add('flipped');
+    sfxReveal();
   }, 700));
   revealTimers.push(setTimeout(() => btn.classList.add('show'), 1700));
 
@@ -652,7 +793,7 @@ function openQuestion(i){
   currentIdx = i;
   answered = false;
   const q = QUESTIONS[i];
-  el('qtag').innerHTML = `KARTU ${String(i+1).padStart(2,'0')} · <b>${DIFF_LABEL[q.diff]} · ${q.pts} PT</b>`;
+  el('qtag').innerHTML = `KARTU <b>${String(i+1).padStart(2,'0')}</b>`;
   const ab = el('assign-box');
   ab.textContent = q.info;
   ab.style.display = q.info ? 'inline-block' : 'none';
@@ -674,10 +815,12 @@ function openQuestion(i){
   TIME_PER_Q = q.time || 20;
   timeLeft = TIME_PER_Q;
   updateRing();
+  startDrone();
   clearInterval(timerHandle);
   timerHandle = setInterval(() => {
     timeLeft -= 1;
     updateRing();
+    if (timeLeft > 0) sfxTick(timeLeft);
     if (timeLeft <= 0){
       clearInterval(timerHandle);
       if (!answered) answer(null); // timeout
@@ -703,6 +846,8 @@ function answer(userSaysTrue){
   const correct = q.answer;
   const isTimeout = userSaysTrue === null;
   const isCorrect = !isTimeout && (userSaysTrue === correct);
+  stopDrone();
+  if (isTimeout) sfxTimeout(); else if (isCorrect) sfxCorrect(); else sfxWrong();
 
   el('btn-true').disabled = true;
   el('btn-false').disabled = true;
@@ -725,13 +870,13 @@ function answer(userSaysTrue){
   const verdict = el('verdict-txt');
   const explain = el('explain-txt');
   if (isTimeout){
-    verdict.textContent = "WAKTU HABIS · 0 PT";
+    verdict.textContent = "WAKTU HABIS";
     verdict.className = "verdict no";
   } else if (isCorrect){
-    verdict.textContent = `TEPAT! +${q.pts} PT`;
+    verdict.textContent = q.prize ? `TEPAT! Hadiahmu: ${q.prize}` : "TEPAT!";
     verdict.className = "verdict ok";
   } else {
-    verdict.textContent = "MELESET · 0 PT";
+    verdict.textContent = "MELESET";
     verdict.className = "verdict no";
   }
   explain.innerHTML = q.explain;
@@ -755,9 +900,9 @@ function backToBoard(){
 
 function finish(){
   showScreen('end');
-  el('end-score').textContent = score;
+  el('end-score').textContent = states.filter(s => s === true).length;
   let rank, msg;
-  el('end-max').textContent = '/' + MAX_SCORE;
+  el('end-max').textContent = `/${QUESTIONS.length} benar`;
   const pct = MAX_SCORE ? (score / MAX_SCORE) * 100 : 0;
   if (pct >= CONFIG.CHAMPION_PERSEN){
     rank = "◆ GRAND CHAMPION ◆";
@@ -771,6 +916,8 @@ function finish(){
   }
   el('end-rank').textContent = rank;
   el('end-msg').textContent = msg;
+  stopDrone();
+  if (pct >= CONFIG.LOLOS_PERSEN) sfxFanfare(); else sfxWrong();
 }
 
 function restart(){
@@ -780,6 +927,7 @@ function restart(){
   showScreen('start');
 }
 
+updateSoundBtn();
 loadQuestions();
 </script>
 </body>
