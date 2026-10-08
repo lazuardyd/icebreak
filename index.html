@@ -339,6 +339,7 @@
   .lvl-easy{ color:var(--cyan); background:rgba(62,230,224,.10); }
   .lvl-med{ color:var(--amber); background:rgba(255,184,51,.10); }
   .lvl-hard{ color:var(--magenta); background:rgba(255,107,214,.10); }
+  .lvl-other{ color:var(--ink); background:rgba(233,236,247,.08); }
   .qtag b{ color:var(--ink); }
   .sound-btn{
     position:fixed; top:14px; right:14px; z-index:60;
@@ -502,11 +503,12 @@ function parseCSV(text){
   return rows.filter(r => r.some(c => c.trim() !== ''));
 }
 
-function normLevel(v){
+function matchLevel(v){
   const t = (v || '').toLowerCase().trim();
-  if (/^(dasar|mudah|easy)/.test(t)) return 'easy';
+  if (/^(dasar|mudah|gampang|easy)/.test(t)) return 'easy';
+  if (/^(menengah|sedang|medium|med)/.test(t)) return 'med';
   if (/^(sulit|susah|hard)/.test(t)) return 'hard';
-  return 'med';
+  return null;
 }
 function parseAnswer(v){
   const t = (v || '').toLowerCase().trim();
@@ -524,11 +526,13 @@ function rowsToQuestions(objs){
     const f = (o.soal || '').trim();
     const ans = parseAnswer(o.jawaban);
     if (!f || ans === null) return;               // baris tidak valid dilewati
-    const diff = normLevel(o.level);
+    const levelLabel = (o.level || '').trim();      // ditampilkan persis seperti yang diisi di sheet
+    const levelCls = matchLevel(o.level) || 'other';
+    const diff = matchLevel(o.level) || 'med';       // hanya untuk waktu bawaan
     const pts = parseInt(o.poin, 10);
     const time = parseInt(o.waktu, 10);
     out.push({
-      diff,
+      diff, levelLabel, levelCls,
       pts: isNaN(pts) ? 10 : pts,
       prize: (o.hadiah || '').trim(),
       time: (!isNaN(time) && time > 0) ? time : DEFAULT_TIME[diff],
@@ -859,7 +863,7 @@ function openQuestion(i){
   currentIdx = i;
   answered = false;
   const q = QUESTIONS[i];
-  el('qtag').innerHTML = `KARTU <b>${String(i+1).padStart(2,'0')}</b><span class="lvl lvl-${q.diff}">${DIFF_LABEL[q.diff]}</span>`;
+  el('qtag').innerHTML = `KARTU <b>${String(i+1).padStart(2,'0')}</b>` + (q.levelLabel ? `<span class="lvl lvl-${q.levelCls}">${esc(q.levelLabel)}</span>` : '');
   const ab = el('assign-box');
   ab.textContent = q.info;
   ab.style.display = q.info ? 'inline-block' : 'none';
